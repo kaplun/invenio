@@ -4270,6 +4270,111 @@ class Template:
 
         return out
 
+    def tmpl_citesummary_narrowing_box(self, searchpattern, searchfield, ln=CFG_SITE_LANG):
+        """HTML citesummary format, narrowing box.  A part of the HCS format suite."""
+
+        import datetime
+        from invenio.search_engine_query_parser import SpiresToInvenioSyntaxConverter
+        stisc = SpiresToInvenioSyntaxConverter()
+
+        def jsify(search):
+            """ This function is for taking example searches and giving them the power to add
+                themselves to the "narrow" box onclick.  It takes a search piece (e.g. 'date 2010')
+                and returns some html which will link that search piece to the add_to_narrowing_box
+                function defined in this page's js. """
+            return '<a href="#" onclick="add_to_narrowing_box(\'%s\')">%s</a>' % (search, search)
+
+        _ = gettext_set_language(ln)
+
+        EXAMPLE_NARROWERS = ['date %s' % datetime.datetime.today().strftime('%Y')]
+        CITEDBY_S = 'and citedby ('
+        CITEDBY_I = 'citedby:('
+
+        p = ''
+        base_search = ''
+        narrowing_search = ''
+        if searchpattern:
+            p = searchpattern
+            if searchfield:
+                if " " in searchpattern:
+                    p = searchfield + ':"' + searchpattern + '"'
+                else:
+                    p = searchfield + ':' + searchpattern
+
+        base_search = p.split(CITEDBY_S)[0].split(CITEDBY_I)[0]
+        if CITEDBY_S in p:
+            narrowing_search = p.split(CITEDBY_S)[1][:-1]
+        elif CITEDBY_I in p:
+            narrowing_search = p.split(CITEDBY_I)[1][:-1]
+
+        if stisc.is_applicable(p):
+            citedby = ' and citedby '
+        else:
+            citedby = ' citedby:'
+
+        example_narrower_html = ' : '.join([jsify(example_narrower) for example_narrower in EXAMPLE_NARROWERS])
+
+        out = """
+           <script type="text/javascript">
+            function add_to_narrowing_box(text) {
+                narrowing_search = document.getElementById('narrow').value;
+                if (narrowing_search == '')
+                    document.getElementById('narrow').value = text;
+                else
+                    document.getElementById('narrow').value = narrowing_search + ' ' + text;
+            }
+            function do_narrow() {
+                search_url = "%(base_url)s/search?p=%(base_search)s+%(citedby)s";
+                narrowing_search = document.getElementById('narrow').value;
+
+                if (narrowing_search == '')
+                    return;
+
+                search_url += '%(open_paren)s' + narrowing_search + '%(close_paren)s';
+
+                /* it would be nice if we had a global function for quoting this
+                    in the .js included on every page... */
+
+                search_url = search_url.replace(/ /g, '+');
+                search_url += "&action_search=search&of=hcs";
+
+                window.location=search_url;
+            }
+            </script>
+            <div class="searchboxbody" style="white-space: nowrap;">
+                <table>
+                <tr>
+                <td>Narrow citing papers by:</td>
+                <td><input size="40" id="narrow" style="display:inline;" value="%(narrowing_search)s"/></td>
+                <td><input type="button" onclick="do_narrow()" name="action_search" value="%(msg_narrow)s".
+                       style="display: inline;"/></td>
+                </tr>
+                <tr>
+                <td></td>
+                <td class="searchboxexample">%(example_narrower_html)s</td>
+                <td></td>
+                </tr>
+                </table>
+            </div>
+           """ % {
+               'open_paren' : quote('('),
+               'close_paren' : quote(')'),
+               'citedby' : citedby,
+               'base_url' : CFG_SITE_URL,
+               'base_search' : base_search,
+               'narrowing_search' : narrowing_search,
+               'msg_narrow' : _("Narrow"),
+               'example_narrower_html' : example_narrower_html,
+               }
+
+        if narrowing_search:
+            out += """<br>
+                      Narrowing by: %(narrowing_search)s [<a href="%(full_set)s">Full set</a>]
+                   """ % {'narrowing_search': narrowing_search,
+                          'full_set': CFG_SITE_URL + '/search?p=' + base_search + '&of=hcs', }
+
+        return out
+
     def tmpl_citesummary_prologue(self, d_total_recs, l_colls, searchpattern, searchfield, ln=CFG_SITE_LANG):
         """HTML citesummary format, prologue. A part of HCS format suite."""
         _ = gettext_set_language(ln)
@@ -4293,24 +4398,18 @@ class Template:
                 link_url += quote(p)
             if colldef:
                 link_url += '%20AND%20' + quote(colldef)
-            link_url += '&amp;rm=citation';
             link_text = self.tmpl_nice_number(d_total_recs[coll], ln)
             out += '<td align="right"><a href="%s">%s</a></td>' % (link_url, link_text)
         out += '</tr>'
         return out
 
-    def tmpl_citesummary_overview(self, d_total_cites, d_avg_cites, l_colls, ln=CFG_SITE_LANG):
+    def tmpl_citesummary_overview(self, d_total_cites, l_colls, ln=CFG_SITE_LANG):
         """HTML citesummary format, overview. A part of HCS format suite."""
         _ = gettext_set_language(ln)
         out = """<tr><td><strong>%(msg_cites)s</strong></td>""" % \
               {'msg_cites': _("Total number of citations:"), }
         for coll, colldef in l_colls:
             out += '<td align="right">%s</td>' % self.tmpl_nice_number(d_total_cites[coll], ln)
-        out += '</tr>'
-        out += """<tr><td><strong>%(msg_avgcit)s</strong></td>""" % \
-               {'msg_avgcit': _("Average citations per paper:"), }
-        for coll, colldef in l_colls:
-            out += '<td align="right">%.1f</td>' % d_avg_cites[coll]
         out += '</tr>'
         out += """<tr><td><strong>%(msg_breakdown)s</strong></td></tr>""" % \
                {'msg_breakdown': _("Breakdown of papers by citations:"), }
@@ -4337,25 +4436,31 @@ class Template:
                 link_url += quote('cited:0')
             else:
                 link_url += quote('cited:%i->%i' % (low, high))
-            link_url += '&amp;rm=citation';
             link_text = self.tmpl_nice_number(d_cites[coll], ln)
             out += '<td align="right"><a href="%s">%s</a></td>' % (link_url, link_text)
         out += '</tr>'
         return out
 
-    def tmpl_citesummary_h_index(self, d_h_factors, l_colls, ln=CFG_SITE_LANG):
-        """HTML citesummary format, h factor output. A part of the HCS suite."""
+    def tmpl_citesummary_additional_metrics(self, d_h_factors, d_num_citing, d_avg_cites, d_median_cites, d_mode_cites, l_colls, ln=CFG_SITE_LANG):
+        """HTML citesummary format, alternate metrics output. A part of the HCS suite."""
         _ = gettext_set_language(ln)
         out = "<tr><td></td></tr><tr><td><strong>%(msg_additional)s</strong> <small><small>[<a href=\"%(help_url)s\">?</a>]</small></small></td></tr>" % \
               {'msg_additional': _("Additional Citation Metrics"),
                'help_url': CFG_SITE_URL + '/help/citation-metrics', }
-        out += '<tr><td>h-index <small><small>[<a href="'
-        # use ? help linking in the style of oai_repository_admin.py
-        out += '%s">' % (CFG_SITE_URL + '/help/citation-metrics#citesummary_h-index')
-        out += '?</a>]</small></small></td>'
-        for coll, colldef in l_colls:
-            out += '<td align="right">%s</td>' % self.tmpl_nice_number(d_h_factors[coll], ln)
-        out += '</tr>'
+
+        for name, info_dict in zip(['h-index', 'average citations per paper', 'median', 'mode', 'distinct citing'],
+                                        [d_h_factors, d_avg_cites, d_median_cites, d_mode_cites, d_num_citing]):
+            out += '''<tr>
+            <td>%(name_text)s
+                <small><small>[<a href="%(CFG_SITE_URL)s/help/citation-metrics#citesummary_%(help_link)s">?</a>]
+            </td>
+                ''' % {'name_text': name,
+                       'CFG_SITE_URL' : CFG_SITE_URL,
+                       'help_link': name.replace(' ', '_')}
+            for coll, colldef in l_colls:
+                out += '<td align="right">%s</td>' % self.tmpl_nice_number(info_dict[coll], ln)
+            out += '</tr>'
+
         return out
 
     def tmpl_citesummary_epilogue(self, ln=CFG_SITE_LANG):
