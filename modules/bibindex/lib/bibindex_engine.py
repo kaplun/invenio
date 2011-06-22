@@ -80,9 +80,11 @@ if CFG_CERN_SITE:
 elif CFG_INSPIRE_SITE:
     CFG_JOURNAL_TAG = '773__%'
     CFG_JOURNAL_PUBINFO_STANDARD_FORM = "773__p,773__v,773__c"
+    CFG_INSPIRE_KEYWORDS_TAG = '695__%'
 else:
     CFG_JOURNAL_TAG = '909C4%'
     CFG_JOURNAL_PUBINFO_STANDARD_FORM = "909C4p 909C4v (909C4y) 909C4c"
+    CFG_INSPIRE_KEYWORDS_TAG = 'A STRING UNLIKELY TO MATCH SINCE THIS INDEX WILL NOT EXIST'
 
 ## precompile some often-used regexp for speed reasons:
 re_subfields = re.compile('\$\$\w')
@@ -175,21 +177,56 @@ def get_field_tags(field):
     res = run_sql(query, (field, ))
     return [row[0] for row in res]
 
-def get_words_from_journal_tag(recID, tag):
-    """
-    Special procedure to extract words from journal tags.  Joins
-    title/volume/year/page into a standard form that is also used for
-    citations.
-    """
+def _get_all_tags_and_subfields(recID, tag):
+    """ return the tags and subfields for tag "tag" on recID "recID"
+        as an sql result object """
 
-    # get all journal tags/subfields:
     bibXXx = "bib" + tag[0] + tag[1] + "x"
     bibrec_bibXXx = "bibrec_" + bibXXx
     query = """SELECT bb.field_number,b.tag,b.value FROM %s AS b, %s AS bb
                 WHERE bb.id_bibrec=%%s
                   AND bb.id_bibxxx=b.id AND tag LIKE %%s""" % (bibXXx, bibrec_bibXXx)
     res = run_sql(query, (recID, tag))
-    # construct journal pubinfo:
+    return res
+
+def get_words_from_inspire_keywords_tag(recID, tag):
+    """
+    Special procedure to extract words for inspire keyword index.
+    We must check to see that the authority is actually INSPIRE; if so, use
+    the 695__a as words.  If not, no words.
+    """
+    res = _get_all_tags_and_subfields(recID, tag)
+
+    all_kws = {}
+    for row in res:
+        nb_instance, subfield, value = row
+        if all_kws.has_key(nb_instance):
+            all_kws[nb_instance][subfield] = value
+        else:
+            all_kws[nb_instance] = {subfield: value}
+
+    words = []
+    AUTHORITY_AND_KEYWORD_TMPL = '695__2 695__a'
+    for kw, tags_and_vals in all_kws.iteritems():
+        authority_and_keyword = AUTHORITY_AND_KEYWORD_TMPL
+        for tag,val in tags_and_vals.iteritems():
+            authority_and_keyword = authority_and_keyword.replace(tag,val)
+        if not authority_and_keyword.startswith('INSPIRE'):
+            # wrong authority, do nothing
+            pass
+        else:
+            words.extend(get_pieces_from_inspire_keywords_phrase(
+                                    authority_and_keyword[len('INSPIRE'):].strip()))
+    return words
+
+def get_words_from_journal_tag(recID, tag):
+    """
+    Special procedure to extract words from journal tags.  Joins
+    title/volume/year/page into a standard form that is also used for
+    citations.
+    """
+    res = _get_all_tags_and_subfields(recID, tag)
+
     dpubinfos = {}
     for row in res:
         nb_instance, subfield, value = row
@@ -530,26 +567,6 @@ def get_phrases_from_phrase(phrase, stemming_language=None):
     return [phrase]
     ## Note that we don't break phrases, they are used for exact style
     ## of searching.
-    words = {}
-    phrase = strip_accents(phrase)
-    # 1st split phrase into blocks according to whitespace
-    for block1 in phrase_delimiter_re.split(strip_accents(phrase)):
-        block1 = block1.strip()
-        if block1 and stemming_language:
-            new_words = []
-            for block2 in re_punctuation.split(block1):
-                block2 = block2.strip()
-                if block2:
-                    for block3 in block2.split():
-                        block3 = block3.strip()
-                        if block3:
-                            # Note that we don't stem phrases, they
-                            # are used for exact style of searching.
-                            new_words.append(block3)
-            block1 = ' '.join(new_words)
-        if block1:
-            words[block1] = 1
-    return words.keys()
 
 def get_fuzzy_authors_from_phrase(phrase, stemming_language=None):
     """
@@ -587,6 +604,18 @@ def get_author_family_name_words_from_phrase(phrase, stemming_language=None):
         for word in get_words_from_phrase(family_name, stemming_language):
             d_family_names_words[word] = 1
     return d_family_names_words.keys()
+
+def get_pieces_from_inspire_keywords_phrase(phrase, stemming_language=None):
+    phrases = {}
+    phrase = strip_accents(phrase)
+    phrases[phrase] = 1
+    pieces = phrase.split(': ')
+    for idx in range(len(pieces)):
+        phrases[pieces[idx]] = 1
+        for begin in range(idx):
+            phrases[': '.join(pieces[begin:idx+1])] = 1
+
+    return phrases.keys()
 
 def apply_stemming_and_stopwords_and_length_check(word, stemming_language):
     """Return WORD after applying stemming and stopword and length checks.
@@ -757,11 +786,6 @@ def update_index_last_updated(index_id, starting_time=None):
     return run_sql("UPDATE idxINDEX SET last_updated=%s WHERE id=%s",
                     (starting_time, index_id,))
 
-#def update_text_extraction_date(first_recid, last_recid):
-    #"""for all the bibdoc connected to the specified recid, set
-    #the text_extraction_date to the task_starting_time."""
-    #run_sql("UPDATE bibdoc JOIN bibrec_bibdoc ON id=id_bibdoc SET text_extraction_date=%s WHERE id_bibrec BETWEEN %s AND %s", (task_get_task_param('task_starting_time'), first_recid, last_recid))
-
 class WordTable:
     "A class to hold the words table."
 
@@ -792,6 +816,11 @@ class WordTable:
         # indexing fulltext. The default is get_words_from_phrase
         self.tag_to_words_fnc_map = tag_to_words_fnc_map
         self.default_get_words_fnc = default_get_words_fnc
+
+        self.WORDS_FROM_TAG_FUNCTION = {
+            CFG_JOURNAL_TAG: get_words_from_journal_tag,
+            CFG_INSPIRE_KEYWORDS_TAG: get_words_from_inspire_keywords_tag,
+        }
 
         if self.stemming_language and self.tablename.startswith('idxWORD'):
             write_message('%s has stemming enabled, language %s' % (self.tablename, self.stemming_language))
@@ -1085,13 +1114,13 @@ class WordTable:
                     wlist[recID] = []
                 wlist[recID] = list_union(get_author_canonical_ids_for_recid(recID),
                                           wlist[recID])
-        # special case of journal index:
-        if self.fields_to_index == [CFG_JOURNAL_TAG]:
-            # FIXME: quick hack for the journal index; a special
-            # treatment where we need to associate more than one
-            # subfield into indexed term
+        # special case of journal and inspirekeyword indexes:
+        if self.fields_to_index[0] in self.WORDS_FROM_TAG_FUNCTION.keys():
+            # treatment for special indexes;
+            # cases where we need information from more than one subfield to do indexing correctly
+            fnc_get_words_from_tag = self.WORDS_FROM_TAG_FUNCTION[self.fields_to_index[0]]
             for recID in range(recID1, recID2 + 1):
-                new_words = get_words_from_journal_tag(recID, self.fields_to_index[0])
+                new_words = fnc_get_words_from_tag(recID, self.fields_to_index[0])
                 if not wlist.has_key(recID):
                     wlist[recID] = []
                 wlist[recID] = list_union(new_words, wlist[recID])
@@ -1511,9 +1540,7 @@ def task_stop_table_close_fnc():
 def task_run_core():
     """Runs the task by fetching arguments from the BibSched task queue.  This is
     what BibSched will be invoking via daemon call.
-    The task prints Fibonacci numbers for up to NUM on the stdout, and some
-    messages on stderr.
-    Return 1 in case of success and 0 in case of failure."""
+    Return True for success, False for failure. """
     global _last_word_table
 
     if task_get_option("cmd") == "check":
@@ -1524,6 +1551,8 @@ def task_run_core():
             elif index_name in ('author', 'firstauthor') and \
                      CFG_BIBINDEX_AUTHOR_WORD_INDEX_EXCLUDE_FIRST_NAMES:
                 fnc_get_words_from_phrase = get_author_family_name_words_from_phrase
+            elif index_name == 'inspirekeyword':
+                fnc_get_words_from_phrase = get_pieces_from_inspire_keywords_phrase
             else:
                 fnc_get_words_from_phrase = get_words_from_phrase
             wordTable = WordTable(index_name=index_name,
@@ -1540,6 +1569,8 @@ def task_run_core():
             if index_name in ('author', 'firstauthor') and \
                    CFG_BIBINDEX_AUTHOR_WORD_INDEX_EXCLUDE_FIRST_NAMES:
                 fnc_get_pairs_from_phrase = get_pairs_from_phrase # FIXME
+            elif index_name == 'inspirekeyword':
+                fnc_get_pairs_from_phrase = get_pieces_from_inspire_keywords_phrase
             else:
                 fnc_get_pairs_from_phrase = get_pairs_from_phrase
             wordTable = WordTable(index_name=index_name,
@@ -1557,6 +1588,8 @@ def task_run_core():
                 fnc_get_phrases_from_phrase = get_fuzzy_authors_from_phrase
             elif index_name in ('exactauthor', 'exactfirstauthor'):
                 fnc_get_phrases_from_phrase = get_exact_authors_from_phrase
+            elif index_name == 'inspirekeyword':
+                fnc_get_phrases_from_phrase = get_pieces_from_inspire_keywords_phrase
             else:
                 fnc_get_phrases_from_phrase = get_phrases_from_phrase
             wordTable = WordTable(index_name=index_name,
@@ -1585,6 +1618,8 @@ def task_run_core():
         elif index_name in ('author', 'firstauthor') and \
                  CFG_BIBINDEX_AUTHOR_WORD_INDEX_EXCLUDE_FIRST_NAMES:
             fnc_get_words_from_phrase = get_author_family_name_words_from_phrase
+        elif index_name == 'inspirekeyword':
+            fnc_get_words_from_phrase = get_pieces_from_inspire_keywords_phrase
         else:
             fnc_get_words_from_phrase = get_words_from_phrase
         wordTable = WordTable(index_name=index_name,
@@ -1655,6 +1690,8 @@ def task_run_core():
         if index_name in ('author', 'firstauthor') and \
                CFG_BIBINDEX_AUTHOR_WORD_INDEX_EXCLUDE_FIRST_NAMES:
             fnc_get_pairs_from_phrase = get_pairs_from_phrase # FIXME
+        elif index_name == 'inspirekeyword':
+            fnc_get_pairs_from_phrase = get_pieces_from_inspire_keywords_phrase
         else:
             fnc_get_pairs_from_phrase = get_pairs_from_phrase
         wordTable = WordTable(index_name=index_name,
@@ -1724,6 +1761,8 @@ def task_run_core():
             fnc_get_phrases_from_phrase = get_fuzzy_authors_from_phrase
         elif index_name in ('exactauthor', 'exactfirstauthor'):
             fnc_get_phrases_from_phrase = get_exact_authors_from_phrase
+        elif index_name == 'inspirekeyword':
+            fnc_get_phrases_from_phrase = get_pieces_from_inspire_keywords_phrase
         else:
             fnc_get_phrases_from_phrase = get_phrases_from_phrase
         wordTable = WordTable(index_name=index_name,

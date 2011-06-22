@@ -546,21 +546,20 @@ class SpiresToInvenioSyntaxConverter:
         'fulltext' : 'fulltext:',
         'ft' : 'fulltext:',
         # topic
-        'topic' : '695__a:',
-        'tp' : '695__a:',
-        'hep-topic' : '695__a:',
-        'desy-keyword' : '695__a:',
-        'dk' : '695__a:',
+        'topic' : 'inspirekeyword:',
+        'tp' : 'inspirekeyword:',
+        'hep-topic' : 'inspirekeyword:',
+        'desy-keyword' : 'inspirekeyword:',
+        'dk' : 'inspirekeyword:',
+        'inspire-keyword' : 'inspirekeyword:',
+        'inspirekeyword' : 'inspirekeyword:',
+        'ik' : 'inspirekeyword:',
 
         # topcite
         'topcite' : 'cited:',
 
         # captions
         'caption' : 'caption:',
-
-        # replace all the keywords without match with empty string
-        # this will remove the noise from the unknown keywrds in the search
-        # and will in all fields for the words following the keywords
 
         # category
         'arx' : '037__c:',
@@ -580,6 +579,11 @@ class SpiresToInvenioSyntaxConverter:
         'fc' : '65017a:',
         'field' : '65017a:',
         'field-code' : '65017a:',
+
+        # replace all the keywords without match with empty string
+        # this will remove the noise from the unknown keywrds in the search
+        # and will in all fields for the words following the keywords
+
         # coden
         'bc' : '',
         'browse-only-indx' : '',
@@ -617,6 +621,7 @@ class SpiresToInvenioSyntaxConverter:
 
     _INVENIO_KEYWORDS_FOR_SPIRES_PHRASE_SEARCHES = [
         'affiliation:',
+        'inspirekeyword:',
         #'cited:', # topcite is technically a phrase index - this isn't necessary
         '773__y:', # journal-year
         '773__c:', # journal-page
@@ -642,7 +647,7 @@ class SpiresToInvenioSyntaxConverter:
 
         # regular expression that matches the contents in single and double quotes
         # taking in mind if they are escaped.
-        self._re_quotes_match = re.compile(r'(?![\\])(".*?[^\\]")' + r"|(?![\\])('.*?[^\\]')")
+        self._re_quotes_match = re.compile(r'(?:^\\)((".*?[^\\]")|(\'.*?[^\\]\'))')
 
         # match cases where a keyword distributes across a conjunction
         self._re_distribute_keywords = re.compile(r'''(?ix)     # verbose, ignorecase on
@@ -686,7 +691,7 @@ class SpiresToInvenioSyntaxConverter:
 
         # match search term, its content (words that are searched) and
         # the operator preceding the term.
-        self._re_search_term_pattern_match = re.compile(r'\b(?P<combine_operator>find|and|or|not)\s+(?P<search_term>\S+:)(?P<search_content>.+?)(?= and not | and | or | not |$)', re.IGNORECASE)
+        self._re_search_term_pattern_match = re.compile(r'\b(?P<combine_operator>find|and|or|not)\s+(?P<search_term>\S+?:)(?P<search_content>.+?)(?= and not | and | or | not |$)', re.IGNORECASE)
 
         # match journal searches
         self._re_search_term_is_journal = re.compile(r'''(?ix)  # verbose, ignorecase
@@ -935,6 +940,10 @@ class SpiresToInvenioSyntaxConverter:
             content = self._re_pattern_double_quotes.sub(lambda x: "\""+string.replace(x.group(1), ' ', '__SPACE__')+"\"", content)
             content = self._re_pattern_regexp_quotes.sub(lambda x: "/"+string.replace(x.group(1), ' ', '__SPACE__')+"/", content)
 
+            if term == 'inspirekeyword:':
+                # XXX: silly special case for DESY/INSPIRE keyword searches
+                # this should ultimately be fixed by a smarter regexp somewhere
+                content = content.replace(':', ': ')
             if term in self._INVENIO_KEYWORDS_FOR_SPIRES_PHRASE_SEARCHES \
                     and not self._re_boolean_expression.search(content) and ' ' in content:
                 # the case of things which should be searched as phrases
@@ -1089,11 +1098,11 @@ class SpiresToInvenioSyntaxConverter:
         for match in self._re_search_term_is_journal.finditer(query):
             result += query[current_position : match.start()]
             result += match.group('leading')
-            search = match.group('search_content')
+            search = match.group('search_content').strip()
             search = _normalise_spaces_and_colons_to_commas_in_triple(search)
             result += search
             current_position = match.end()
-        result += query[current_position : ]
+        result += query[current_position:]
         return result
 
     def _standardize_already_invenio_keywords(self, query):
@@ -1117,33 +1126,8 @@ class SpiresToInvenioSyntaxConverter:
 
         Replacements are done only in content that is not in quotes."""
 
-        # result of the replacement
-        result = ""
-        current_position = 0
-
-        for match in self._re_quotes_match.finditer(query):
-            # clean the content after the previous quotes and before current quotes
-            cleanable_content = query[current_position : match.start()]
-            cleanable_content = self._replace_all_spires_keywords_in_string(cleanable_content)
-
-            # get the content in the quotes (group one matches double
-            # quotes, group 2 singles)
-            if match.group(1):
-                quoted_content = match.group(1)
-            elif match.group(2):
-                quoted_content = match.group(2)
-
-            # append the processed content to the result
-            result = result + cleanable_content + quoted_content
-
-            # move current position at the end of the processed content
-            current_position = match.end()
-
-        # clean the content from the last appearance of quotes till the end of the query
-        cleanable_content = query[current_position : len(query)]
-        cleanable_content = self._replace_all_spires_keywords_in_string(cleanable_content)
-        result = result + cleanable_content
-
+        result = self._apply_to_cleanable_content(self._replace_all_spires_keywords_in_string,
+                                                  query)
         return result
 
     def _replace_all_spires_keywords_in_string(self, query):
@@ -1163,9 +1147,8 @@ class SpiresToInvenioSyntaxConverter:
         regex_string = r'(?P<operator>(^find|\band|\bor|\bnot|\brefersto|\bcitedby|^)\b[:\s\(]*)' + \
                        old_keyword + r'(?P<end>[\s\(]+|$)'
         regular_expression = re.compile(regex_string, re.IGNORECASE)
-        result = regular_expression.sub(r'\g<operator>' + new_keyword + r'\g<end>', query)
-        result = re.sub(':\s+', ':', result)
-        return result
+        query = regular_expression.sub(r'\g<operator>' + new_keyword + r'\g<end>', query)
+        return query
 
     def _replace_second_order_keyword(self, query, old_keyword, new_keyword):
         """Replaces old second-order keyword in the query with a new keyword"""
@@ -1182,10 +1165,8 @@ class SpiresToInvenioSyntaxConverter:
                                  [\s\(]+|     # or a paren opening
                                  $            # or the end of the string
                             )''' % old_keyword)
-        result = regular_expression.sub(r'\g<operator>' + new_keyword + r'\g<endorop>', query)
-        result = re.sub(':\s+', ':', result)
-
-        return result
+        query = regular_expression.sub(r'\g<operator>' + new_keyword + r'\g<endorop>', query)
+        return query
 
     def _distribute_keywords_across_combinations(self, query):
         """author:ellis and james -> author:ellis and author:james"""
@@ -1201,17 +1182,53 @@ class SpiresToInvenioSyntaxConverter:
         while still_matches:
             query = self._re_distribute_keywords.sub(create_replacement_pattern, query)
             still_matches = self._re_distribute_keywords.search(query)
-        query = re.sub(r'\s+', ' ', query)
         return query
 
     def _distribute_and_quote_second_order_ops(self, query):
         """refersto:s parke -> refersto:\"s parke\""""
         def create_replacement_pattern(match):
             return match.group('second_order_op') + '"' +\
-                        match.group('search_terms') + '"' +\
+                        match.group('search_terms').strip() + '"' +\
                    match.group('conjunction_or_next_keyword')
 
         for match in self._re_second_order_op_no_index_match.finditer(query):
             query = self._re_second_order_op_no_index_match.sub(create_replacement_pattern, query)
+        result = self._apply_to_cleanable_content(self._clean_extra_spaces, query)
+        return result
+
+    def _apply_to_cleanable_content(self, func, query):
+        """ given a query, apply the function func to all parts of the query not contained
+            in quotation marks ;
+            func should be a function that takes a string and returns a string. """
+        result = ""
+        current_position = 0
+
+        for match in self._re_quotes_match.finditer(query):
+            # clean the content after the previous quotes and before current quotes
+            cleanable_content = query[current_position : match.start()]
+            cleaned_content = func(cleanable_content)
+
+            # get the content in the quotes (group one matches double
+            # quotes, group 2 singles)
+            if match.group(1):
+                quoted_content = match.group(1)
+            elif match.group(2):
+                quoted_content = match.group(2)
+
+            # append the processed content to the result
+            result = result + cleaned_content + quoted_content
+
+            # move current position at the end of the processed content
+            current_position = match.end()
+
+        # clean the content from the last appearance of quotes till the end of the query
+        cleanable_content = query[current_position : len(query)]
+        cleaned_content = func(cleanable_content)
+        result = result + cleaned_content
+        return result
+
+    def _clean_extra_spaces(self, query):
+        """ remove extraneous spaces """
+        query = re.sub(r':\s+', ':', query)
         query = re.sub(r'\s+', ' ', query)
         return query

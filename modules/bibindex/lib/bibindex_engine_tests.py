@@ -97,6 +97,36 @@ class TestGetWordsFromPhrase(unittest.TestCase):
         l_words_obtained.sort()
         self.assertEqual(l_words_obtained, l_words_expected)
 
+class TestGetPhrasesFromINSPIREKeyword(unittest.TestCase):
+    """ Tests for getting INSPIRE keywords from the 695__a tag """
+
+    def test_inspire_keyword_with_spaces(self):
+        """bibindex engine - getting words from 'word 1: word 2' phrase, INSPIRE style"""
+        test_phrase = 'word 1: word 2'
+        words_expected = ['word 1', 'word 2', 'word 1: word 2']
+        words_expected.sort()
+        words_obtained = bibindex_engine.get_pieces_from_inspire_keywords_phrase(test_phrase)
+        words_obtained.sort()
+        self.assertEqual(words_obtained, words_expected)
+
+    def test_inspire_keyword_double(self):
+        """bibindex engine - getting words from 'word1: word2' phrase, INSPIRE style"""
+        test_phrase = 'word1: word2'
+        words_expected = ['word1', 'word2', 'word1: word2']
+        words_expected.sort()
+        words_obtained = bibindex_engine.get_pieces_from_inspire_keywords_phrase(test_phrase)
+        words_obtained.sort()
+        self.assertEqual(words_obtained, words_expected)
+
+    def test_inspire_keyword_triple(self):
+        """bibindex engine - getting words from 'word1: word2: word3' phrase, INSPIRE style"""
+        test_phrase = 'word1: word2: word3'
+        words_expected = ['word1', 'word2', 'word3', 'word1: word2', 'word2: word3', 'word1: word2: word3']
+        words_expected.sort()
+        words_obtained = bibindex_engine.get_pieces_from_inspire_keywords_phrase(test_phrase)
+        words_obtained.sort()
+        self.assertEqual(words_obtained, words_expected)
+
 class TestGetWordsFromDateTag(unittest.TestCase):
     """Tests for getting words for date-like tag."""
 
@@ -144,6 +174,7 @@ TEST_SUITE = make_test_suite(TestListSetOperations,
                              TestWashIndexTerm,
                              TestGetWordsFromPhrase,
                              TestGetWordsFromDateTag,
+                             TestGetPhrasesFromINSPIREKeyword,
                              TestGetAuthorFamilyNameWords)
 
 if __name__ == "__main__":

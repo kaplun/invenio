@@ -575,16 +575,20 @@ class TestSpiresToInvenioSyntaxConverter(unittest.TestCase):
 
     def test_distribution_without_spacing(self):
         """SPIRES search syntax - find aff SLAC and Stanford ->affiliation:SLAC and affiliation:Stanford"""
-        # motivated by trac-187
         spi_search = "find aff SLAC and Stanford"
         inv_search = "affiliation:SLAC and affiliation:Stanford"
         self._compare_searches(inv_search, spi_search)
 
     def test_distribution_with_phrases(self):
         """SPIRES search syntax - find aff Penn State U -> affiliation:"Penn State U"""
-        # motivated by trac-517
         spi_search = "find aff Penn State U"
         inv_search = "affiliation:\"Penn State U\""
+        self._compare_searches(inv_search, spi_search)
+
+    def test_spires_keyword_distribution_single_quoted_char(self):
+        """SPIRES search syntax - find (title top or "t") and cn d0"""
+        spi_search = 'find (title top or "t") and cn d0'
+        inv_search = '(title:top or title:"t") and collaboration:d0'
         self._compare_searches(inv_search, spi_search)
 
     def test_distribution_with_many_clauses(self):
@@ -605,10 +609,22 @@ class TestSpiresToInvenioSyntaxConverter(unittest.TestCase):
         inv_search = 'recid:111111'
         self._compare_searches(inv_search, spi_search)
 
+    def test_inspire_keyword_translation(self):
+        """SPIRES search syntax - find ik B --> pi pi"""
+        spi_search = "find ik B --> pi pi"
+        inv_search = "inspirekeyword:\"B --> pi pi\""
+        self._compare_searches(inv_search, spi_search)
+
     def test_desy_keyword_translation(self):
         """SPIRES search syntax - find dk "B --> pi pi" """
         spi_search = "find dk \"B --> pi pi\""
-        inv_search = "695__a:\"B --> pi pi\""
+        inv_search = "inspirekeyword:\"B --> pi pi\""
+        self._compare_searches(inv_search, spi_search)
+
+    def test_multiple_desy_keyword_translation(self):
+        """SPIRES search syntax - fin dk A: B"""
+        spi_search = "fin dk A: B"
+        inv_search = 'inspirekeyword:"A: B"'
         self._compare_searches(inv_search, spi_search)
 
     def test_journal_section_joining(self):
