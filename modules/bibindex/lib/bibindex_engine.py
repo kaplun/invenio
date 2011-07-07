@@ -614,6 +614,9 @@ def get_pieces_from_inspire_keywords_phrase(phrase, stemming_language=None):
         phrases[pieces[idx]] = 1
         for begin in range(idx):
             phrases[': '.join(pieces[begin:idx+1])] = 1
+        if pieces[idx].startswith('(') and pieces[idx].endswith(')'):
+            particles = pieces[idx][1:-1].split()
+            phrases.update((particle, 1) for particle in particles)
 
     return phrases.keys()
 

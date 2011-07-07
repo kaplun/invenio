@@ -127,6 +127,24 @@ class TestGetPhrasesFromINSPIREKeyword(unittest.TestCase):
         words_obtained.sort()
         self.assertEqual(words_obtained, words_expected)
 
+    def test_inspire_keyword_particle_split(self):
+        """bibindex engine - getting particles from (pi+ pi-), INSPIRE style"""
+        test_phrase = '(pi+ pi-)'
+        words_expected = ['pi+', 'pi-', '(pi+ pi-)']
+        words_expected.sort()
+        words_obtained = bibindex_engine.get_pieces_from_inspire_keywords_phrase(test_phrase)
+        words_obtained.sort()
+        self.assertEqual(words_obtained, words_expected)
+
+    def test_inspire_keyword_particle_split_and_words(self):
+        """bibindex engine - getting particles from (pi+ pi-): word 1, INSPIRE style"""
+        test_phrase = '(pi+ pi-): word 1'
+        words_expected = ['pi+', 'pi-', '(pi+ pi-)', 'word 1', '(pi+ pi-): word 1']
+        words_expected.sort()
+        words_obtained = bibindex_engine.get_pieces_from_inspire_keywords_phrase(test_phrase)
+        words_obtained.sort()
+        self.assertEqual(words_obtained, words_expected)
+
 class TestGetWordsFromDateTag(unittest.TestCase):
     """Tests for getting words for date-like tag."""
 
