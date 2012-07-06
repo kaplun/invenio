@@ -1247,6 +1247,9 @@ class SpiresToInvenioSyntaxConverter:
             for i in range(1,len(author_name)):
                 search_pattern += ' or ' + self._EA_TAG + "\"%s, %s\"" % (author_surname, author_name[0:i])
 
+            if not author_middle_name:
+                search_pattern +=  ' or ' + self._A_TAG + '"' + author_surname + ', ' + author_name[0] + ' *"'
+
         search_pattern += ' or %s"%s, *"' % (self._A_TAG, full_search)
 
         return search_pattern
