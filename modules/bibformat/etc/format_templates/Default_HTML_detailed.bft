@@ -29,7 +29,8 @@ escape="0"
 <BFE_KEYWORDS
 prefix="<br /><small><strong>Keyword(s): </strong></small>"
 keyword_prefix="<small>"
-keyword_suffix="</small>" />
+keyword_suffix="</small>"
+escape="no" />
 
 <BFE_NOTES
 note_prefix="<br /><small><strong>Note: </strong>"
