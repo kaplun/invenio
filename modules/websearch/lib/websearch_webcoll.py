@@ -978,6 +978,9 @@ def compare_timestamps_with_tolerance(timestamp1,
        and 1 if TIMESTAMP1 is greater than TIMESTAMP2 plus TOLERANCE.
     """
     # remove any trailing .00 in timestamps:
+    if not timestamp1 or not timestamp2:
+        ## First time run
+        return 1
     timestamp1 = re.sub(r'\.[0-9]+$', '', timestamp1)
     timestamp2 = re.sub(r'\.[0-9]+$', '', timestamp2)
     # first convert timestamps to Unix epoch seconds:
