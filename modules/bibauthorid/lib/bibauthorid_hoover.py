@@ -521,8 +521,9 @@ def hoover(authors=None, check_db_consistency=False, dry_run=False,
     if rt_ticket_report:
         global ticket_hashes
         write_message("Ticketing system rt is used", verbose=9)
-        write_message("Building hash cache for tickets", verbose=9)
+        write_message("Building hash cache for tickets for queue %s" % queue, verbose=9)
         ticket_ids = BIBCATALOG_SYSTEM.ticket_search(None, subject='[Hoover]', queue=queue)
+        write_message("Found %s existing tickets" % len(ticket_ids), verbose=9)
         for ticket_id in ticket_ids:
             task_sleep_now_if_required(can_stop_too=True)
             try:
