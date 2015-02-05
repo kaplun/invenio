@@ -2319,15 +2319,7 @@ def get_orcid_id_of_author(pid):  # get_orcids_by_pids
     @return: ORCID external identifier
     @rtype: tuple ((str),)
     '''
-    result = _select_from_aidpersoniddata_where(select=['data'], pid=pid, tag='extid:ORCID')
-    if result:
-        #if len(result) > 1:
-            #from bibauthorid_hoover import NonUniqueIdentifiersException
-            #raise NonUniqueIdentifiersException('Non unique identifier', result, 'ORCID', identifier)
-        return result[0][0]
-    return tuple()
-
-
+    return _select_from_aidpersoniddata_where(select=['data'], pid=pid, tag='extid:ORCID')
 
 def create_new_author_by_uid(uid=-1, uid_is_owner=False):  # create_new_person
     '''
@@ -2880,19 +2872,19 @@ def get_papers_affected_since(date_from, date_to=None):  # personid_get_recids_a
     """
     Gets the records whose bibauthorid informations changed between
     date_from and date_to (inclusive).
-    
+
     If date_to is None, gets the records whose bibauthorid informations
     changed after date_to (inclusive).
-    
+
     @param date_from: the date after which this function will look for
         affected records.
     @type date_from: datetime.datetime
-    
+
     @param date_to: the date before which this function will look for
         affected records. Currently this is not supported and is
         ignored. Should be supported in the future.
     @type date_to: datetime.datetime or None
-    
+
     @return: affected record ids
     @return type: intbitset
     """
