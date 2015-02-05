@@ -522,8 +522,9 @@ def hoover(authors=None, check_db_consistency=False, dry_run=False,
         global ticket_hashes
         write_message("Ticketing system rt is used", verbose=9)
         write_message("Building hash cache for tickets", verbose=9)
-        ticket_ids = BIBCATALOG_SYSTEM.ticket_search(None, subject='[Hoover]')
+        ticket_ids = BIBCATALOG_SYSTEM.ticket_search(None, subject='[Hoover]', queue=queue)
         for ticket_id in ticket_ids:
+            task_sleep_now_if_required(can_stop_too=True)
             try:
                 ticket_data = BIBCATALOG_SYSTEM.ticket_get_info(
                     None, ticket_id)
