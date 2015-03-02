@@ -75,6 +75,14 @@ def deleted_recids_cache(cache={}):
     return cache['deleted_records']
 
 
+def superseeded_recids_cache(cache={}):
+    if 'superseeded_records' not in cache:
+        cache['superseeded_records'] = intbitset(run_sql('select id_bibrec '
+            'from bibrec_bib78x join bib78x on id_bibxxx=id '
+            'where tag like "78502%"'))
+    return cache['superseeded_records']
+
+
 def get_recids_matching_query(p, f, config, m='e'):
     """Return set of recIDs matching query for pattern p in field f.
 
@@ -273,7 +281,8 @@ def process_and_store(recids, config, chunk_size, loss_checks=True):
         # Check that we haven't lost too many citations
         # (raises an exception if needed)
         if loss_checks:
-            check_citations_losses(config, chunk, refs, cites)
+            check_citations_losses(config, intbitset(chunk) -
+                                   superseeded_recids_cache(), refs, cites)
         # Store processed citations/references
         store_dicts(chunk, refs, cites)
         modified = True
