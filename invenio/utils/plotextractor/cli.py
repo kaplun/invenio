@@ -49,7 +49,7 @@ from invenio_client import InvenioConnector
 
 from .converter import convert_images, extract_text, untar
 from .getter import get_list_of_all_matching_files, make_single_directory, \
-    parse_and_download, tarballs_by_arXiv_id, tarballs_by_recids
+    parse_and_download, tarballs_by_arXiv_id
 from .output_utils import assemble_caption, create_MARC, create_contextfiles, \
     find_open_and_close_braces, get_image_location, get_tex_location, \
     prepare_image_data, remove_dups, write_message
@@ -113,7 +113,6 @@ def main():
     squash = False
     squash_path = ""
     yes_i_know = False
-    recids = None
     with_docname = None
     with_doctype = None
     with_docformat = None
@@ -133,8 +132,6 @@ def main():
             tdir = arg
         elif opt in ['-i', '--' + infile_param]:
             infile = arg
-        elif opt in ['-r', '--' + recid_param]:
-            recids = arg
         elif opt in ['-a', '--' + arXiv_param]:
             arXiv = arg
         elif opt in ['--' + with_docname_param]:
@@ -197,10 +194,6 @@ def main():
         tars_and_gzips.extend(get_list_of_all_matching_files(tdir, filetypes))
     if infile:
         tars_and_gzips.extend(parse_and_download(infile, sdir))
-    if recids:
-        tars_and_gzips.extend(
-            tarballs_by_recids(recids, sdir, with_docname, with_doctype,
-                               with_docformat))
     if arXiv:
         tars_and_gzips.extend(tarballs_by_arXiv_id([arXiv], sdir))
     if not tars_and_gzips:
@@ -1298,13 +1291,11 @@ help_string = """
             plotextractor -d tar/dir -s scratch/dir
             plotextractor -i inputfile -u
             plotextractor --arXiv=arXiv_id
-            plotextractor --recid=recids
 
     example:
             plotextractor -d /some/path/with/tarballs
             plotextractor -i input.txt --no-sdir --extract-text
             plotextractor --arXiv=hep-ex/0101001
-            plotextractor --recid=13-20,29
 
     options:
         -d, --tardir=
@@ -1355,10 +1346,6 @@ help_string = """
 
         -k, --skip-refno
             allows you to skip any refno check
-
-        -r, --recid=
-            if you want to process the tarball of one recid, use this tag.  it
-            will also accept ranges (i.e. --recid=13-20)
 
         --with-docname=
             allow to choose files to process on the basis of their docname,

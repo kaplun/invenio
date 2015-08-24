@@ -23,17 +23,15 @@ from invenio.config import CFG_TMPDIR, \
                            CFG_PLOTEXTRACTOR_SOURCE_TARBALL_FOLDER, \
                            CFG_PLOTEXTRACTOR_SOURCE_PDF_FOLDER, \
                            CFG_PLOTEXTRACTOR_DOWNLOAD_TIMEOUT
-from .config import CFG_PLOTEXTRACTOR_DESY_BASE, \
-                                         CFG_PLOTEXTRACTOR_DESY_PIECE
-from invenio.legacy.search_engine import get_record
-from invenio.legacy.bibdocfile.api import BibRecDocs
-from invenio.legacy.bibrecord import record_get_field_instances, \
-                              field_get_subfield_values
+
+
 from invenio.utils.shell import run_shell_command
-from .output_utils import write_message
-from invenio.legacy.bibdocfile.api import BibRecDocs
+
 from invenio.utils.filedownload import download_url, InvenioFileDownloadError
 
+from .config import CFG_PLOTEXTRACTOR_DESY_BASE, \
+                                         CFG_PLOTEXTRACTOR_DESY_PIECE
+from .output_utils import write_message
 
 PDF_EXTENSION = '.pdf'
 
@@ -230,72 +228,6 @@ def get_list_of_all_matching_files(basedir, filetypes):
                     file_paths.append(full_path)
 
     return file_paths
-
-def tarballs_by_recids(recids, sdir, docname=None, doctype=None, docformat=None):
-    """
-    Take a string representing one recid or several and get the associated
-    tarballs for those ids. By default look for files with names matching
-    the report number and with source field 'arXiv'. This can be changed
-    with C{docname}, C{doctype}, C{docformat}
-
-    @param: recids (string): the record id or ids
-    @param: sdir (string): where the tarballs should live
-    @param docname: select tarball for given recid(s) that match docname
-    @param doctype: select tarball for given recid(s) that match doctype
-    @param docformat: select tarball for given recid(s) that match docformat
-    @return: tarballs ([string, string, ...]): locations of tarballs
-    """
-    if not recids:
-        return []
-
-    list_of_ids = []
-
-    if ',' in recids:
-        recids = recids.split(',')
-        for recid in recids:
-            if '-' in recid:
-                low, high = recid.split('-')
-                recid = range(int(low), int(high))
-                list_of_ids.extend(recid)
-            else:
-                recid = int(recid)
-                list_of_ids.append(recid)
-
-    else:
-        if '-' in recids:
-            low, high = recids.split('-')
-            list_of_ids = range(int(low), int(high))
-        else:
-            list_of_ids = [int(recids)]
-
-    arXiv_ids = []
-    local_files = []
-    for recid in list_of_ids:
-        rec = get_record(recid)
-        if not doctype and not docname and not docformat:
-            for afieldinstance in record_get_field_instances(rec, tag='037'):
-                if len(field_get_subfield_values(afieldinstance, '9')) > 0:
-                    if 'arXiv' == field_get_subfield_values(afieldinstance, '9')[0]:
-                        arXiv_id = field_get_subfield_values(afieldinstance, 'a')[0]
-                        arXiv_ids.append(arXiv_id)
-        else:
-            bibarchive = BibRecDocs(recid)
-            all_files = bibarchive.list_latest_files()
-            if doctype:
-                all_files = [docfile for docfile in all_files if
-                             docfile.get_type() == doctype]
-            if docname:
-                all_files = [docfile for docfile in all_files if
-                             docfile.get_name() == docname]
-            if docformat:
-                all_files = [docfile for docfile in all_files if
-                             docfile.get_format() == docformat]
-            local_files.extend([(docfile.get_path(), recid) for docfile in all_files])
-
-    if doctype or docname or docformat:
-        return local_files
-
-    return tarballs_by_arXiv_id(arXiv_ids, sdir)
 
 def tarballs_by_arXiv_id(arXiv_ids, sdir):
     """
