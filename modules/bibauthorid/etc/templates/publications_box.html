@@ -1,36 +1,54 @@
-<div class="tab-content">
-
-    <div class="tab-pane" id="internal-pubs">
-    <!-- Internal Publications -->
-        {% if not internal_pubs %}
-        <h4>No publications.</h4>
-        {% endif %}
-        <ol>
-        {% for title, url, recid in internal_pubs %}
-            <li><a href="{{ url }}">{{ '%s%s' % (base_url, url) if not title or title == '' else title }}</a></li>{% endfor %}
-        </ol>
-        <a href="{{ all_pubs_search_link }}">Click here to see all</a>
+<div class="well well-small inspire-well" id="pubs_list" data-box-source="publications-list">
+    <div class="bai-box-title">
+        <ul class="pub-tabs">
+            {% if visible["publications"] %}
+                <li><a href="#internal-pubs" data-toggle="tab">Publications</a>
+                </li>
+            {% endif %}
+            {% if visible["datasets"] or not datasets %}
+                <li><a href="#datasets" data-toggle="tab">Datasets ({{ datasets|length }})</a>
+                </li>
+            {% endif %}
+            {% if visible["external"] or not external_pubs %}
+                <li><a href="#external-pubs" data-toggle="tab">External ({{ external_pubs|length }})</a>
+                </li>
+            {% endif %}
+        </ul>
     </div>
+    <div class="bai-box-content">
+        <div class="tab-content">
+            <div class="tab-pane" id="internal-pubs">
+            <!-- Internal Publications -->
+                {% if not internal_pubs %}
+                <h4>No publications.</h4>
+                {% endif %}
+                <ol>
+                {% for title, url, recid in internal_pubs %}
+                    <li><a href="{{ url }}">{{ '%s%s' % (base_url, url) if not title or title == '' else title }}</a></li>{% endfor %}
+                </ol>
+                <a href="{{ all_pubs_search_link }}">Click here to see all</a>
+            </div>
 
-    <div class="tab-pane" id="datasets">
-    <!-- Datasets -->
-        {% if not datasets %}
-        <h4>No data sets.</h4>
-        {% endif %}
-        <ol>{% for title, url, recid in datasets %}
-            <li><a href="{{ url }}">{{ '%s%s' % (base_url, url) if not title or title == '' else title }}</a></li>{% endfor %}
-        </ol>
+            <div class="tab-pane" id="datasets">
+            <!-- Datasets -->
+                {% if not datasets %}
+                <h4>No data sets.</h4>
+                {% endif %}
+                <ol>{% for title, url, recid in datasets %}
+                    <li><a href="{{ url }}">{{ '%s%s' % (base_url, url) if not title or title == '' else title }}</a></li>{% endfor %}
+                </ol>
+            </div>
+
+            <div class="tab-pane" id="external-pubs">
+            <!-- External Publications -->
+                {% if not external_pubs %}
+                <h4>No external publications.</h4>
+                {% endif %}
+                <ol>
+                {% for title, url, type in external_pubs %}
+                    <li><a href="{{ url }}">{{ '%s%s' % (base_url, url) if not title or title == '' else title }}</a></li>{% endfor %}
+                </ol>
+            </div>
+        </div>
     </div>
-
-    <div class="tab-pane" id="external-pubs">
-    <!-- External Publications -->
-        {% if not external_pubs %}
-        <h4>No external publications.</h4>
-        {% endif %}
-        <ol>
-        {% for title, url, type in external_pubs %}
-            <li><a href="{{ url }}">{{ '%s%s' % (base_url, url) if not title or title == '' else title }}</a></li>{% endfor %}
-        </ol>
-    </div>
-
 </div>

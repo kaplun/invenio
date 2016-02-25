@@ -34,7 +34,7 @@ from invenio.bibformat import format_record
 from invenio.session import get_session
 from invenio.search_engine_utils import get_fieldvalues
 from invenio.bibauthorid_config import PERSONID_EXTERNAL_IDENTIFIER_MAP, CREATE_NEW_PERSON, CFG_BIBAUTHORID_ENABLED, \
-    BIBAUTHORID_CFG_SITE_NAME
+    BIBAUTHORID_CFG_SITE_NAME, AID_VISIBILITY
 from invenio.bibauthorid_webapi import get_person_redirect_link, get_canonical_id_from_person_id, \
     get_person_names_from_id, get_person_info_by_pid
 from invenio.bibauthorid_frontinterface import get_uid_of_author
@@ -347,7 +347,9 @@ class WebProfilePage():
         @return: HTML Markup
         @rtype: str
         """
-        return WebProfilePage.environment.get_template("publications_box.html").render(template_vars)
+        context = {}
+        context["visible"] = AID_VISIBILITY
+        return WebProfilePage.environment.get_template("publications_box.html").render(template_vars, context=context)
 
     def get_profile_page_body(self, last_computed, trial="default"):
         if trial is not None or not trial == "default":
