@@ -331,7 +331,7 @@ def OAI_Request(server, script, params, method="POST", secure=False,
         elif response.status == 503:
             try:
                 nb_seconds_to_wait = \
-                    int(response.getheader("Retry-After", "%d" % (i*i)))
+                    int(response.getheader("Retry-After", "%d" % (i*i))) + 3
             except ValueError:
                 nb_seconds_to_wait = 10
             sys.stderr.write("Retry in %d seconds...\n" % nb_seconds_to_wait)
