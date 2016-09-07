@@ -61,6 +61,14 @@ def get_records_wit_erratum():
         _RECORDS_WITH_ERRATUM = search_pattern(p='**', f='773__m')
     return _RECORDS_WITH_ERRATUM
 
+_RECORDS_WITHDRAWN = None
+def get_records_withdrawn():
+    global _RECORDS_WITHDRAWN
+    if _RECORDS_WITHDRAWN is None:
+        from invenio.search_engine import search_pattern
+        _RECORDS_WITHDRAWN = search_pattern(p='980:withdrawn')
+    return _RECORDS_WITHDRAWN
+
 
 def record_duplicates_in_asana(match, recids):
     if not CFG_INSPIRE_SITE:
@@ -246,9 +254,11 @@ def check_citations_losses(config, recids, refs, cites):
             try:
                 assert record_refs_diff > -citation_loss_per_record_limit
             except AssertionError:
-                prefix = "Record %s lost too many references: %s refs" \
-                         % (recid, record_refs_diff)
-                report_loss(recid, prefix, True)
+                # Withdrawn records have their references removed
+                if not recid in get_records_withdrawn():
+                    prefix = "Record %s lost too many references: %s refs" \
+                            % (recid, record_refs_diff)
+                    report_loss(recid, prefix, True)
                 if recid not in records_to_ignore:
                     records_to_ignore.append(recid)
 
